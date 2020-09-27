@@ -5,6 +5,7 @@ import imutils
 from scipy.spatial import distance
 from network import MultilayerNeuralNetwork
 from digit_classifier import CnnClassifier
+from imutils.perspective import four_point_transform
 
 
 class Sudoku_Detector:
@@ -15,31 +16,60 @@ class Sudoku_Detector:
 
 
 	def preprocess(self,image):
-		gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-		proc = cv2.GaussianBlur(gray, (9, 9), 0)
-		proc = cv2.adaptiveThreshold(proc, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+		# gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+		# proc = cv2.GaussianBlur(gray, (9, 9), 0)
+		# proc = cv2.adaptiveThreshold(proc, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
-		proc = cv2.bitwise_not(proc, proc)  
-		kernel = np.array([[0., 1., 0.], [1., 1., 1.], [0., 1., 0.]],np.uint8)
-		proc = cv2.dilate(proc, kernel)
+		# proc = cv2.bitwise_not(proc, proc)  
+		# kernel = np.array([[0., 1., 0.], [1., 1., 1.], [0., 1., 0.]],np.uint8)
+		# proc = cv2.dilate(proc, kernel)
+
 		# proc = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 		# proc = cv2.GaussianBlur(proc, (7, 7), 0)  
 		# proc = cv2.morphologyEx(proc, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8)) 
 		# proc = cv2.adaptiveThreshold(proc, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY, 19, 2)
 		# proc = cv2.morphologyEx(proc, cv2.MORPH_OPEN, np.ones((2, 2)))
 
-		if self._debug:
-			cv2.imshow("After Preprocessing",proc)
-			cv2.waitKey(0)
+		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+		blurred = cv2.GaussianBlur(gray, (7, 7), 3)
 
-		return proc,gray
+		thresh = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+		thresh = cv2.bitwise_not(thresh)
+
+		if self._debug:
+			cv2.imshow("After Preprocessing",thresh)
+			cv2.waitKey(0)
+			# exit(0)
+
+		return thresh,gray
 
 
 	def find_corners(self,image):
-		cnts,_ = cv2.findContours(image, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-		outer_square = max(cnts,key=cv2.contourArea)
-		peri = cv2.arcLength(outer_square, True)
-		outer_square = cv2.approxPolyDP(outer_square,0.01*peri,True)
+		# cnts,_ = cv2.findContours(image, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+		cnts,_ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+		cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
+		outer_square = None
+		for cnt in cnts:
+			peri = cv2.arcLength(cnt, True)
+			approx = cv2.approxPolyDP(cnt,0.01*peri,True)
+			if len(approx) == 4:
+				outer_square = approx
+				break
+
+		if outer_square is None:
+			print("Could not find the grid")
+			exit(0)
+		# outer_square = max(cnts,key=cv2.contourArea)
+		# peri = cv2.arcLength(outer_square, True)
+		# outer_square = cv2.approxPolyDP(outer_square,0.01*peri,True)
+		self.puzzle = four_point_transform(self.original_image, outer_square.reshape(4, 2))
+		# warped = four_point_transform(gray, outer_square.reshape(4, 2))
+
+		if self._debug:
+			clone = self.original_image.copy()
+			cv2.drawContours(clone,outer_square, -1, (0, 255, 0), 5)
+			cv2.imshow('Corners',clone)
+			cv2.waitKey(0)
 
 		outer_points = [list(point[0]) for point in outer_square] 
 		top_left,top_right = min(outer_points,key=lambda x:x[0]+x[1]), max(outer_points,key=lambda x:x[0]-x[1])
@@ -61,6 +91,7 @@ class Sudoku_Detector:
 		if self._debug:
 			cv2.imshow("ROI",image)
 			cv2.waitKey(0)
+			
 
 		return image
 
@@ -88,13 +119,14 @@ class Sudoku_Detector:
 			return None
 
 		digit = cv2.bitwise_and(thresh, thresh, mask=mask)
-		digit = cv2.resize(digit,(28,28),interpolation=cv2.INTER_AREA)
+		digit = cv2.resize(digit,(64,64),interpolation=cv2.INTER_AREA)
 		thresh = cv2.resize(thresh,(28,28),interpolation=cv2.INTER_AREA)
 		# thresh.re
 		# print(type(digit))
 		# print(digit.shape)
 		res = self.classifier.detect(digit)
 		# res = self.classifier.predict(thresh.reshape(28*28,-1))
+		# res = self.classifier.predict(digit)
 		# res = np.argmax(res,axis=0)
 		print(res)
 		# print(res.shape)
@@ -121,6 +153,7 @@ class Sudoku_Detector:
 		return cells
 
 	def detect(self,image):
+		self.original_image = image.copy()
 		proc_img, gray = self.preprocess(image)
 		corners = self.find_corners(proc_img)
 

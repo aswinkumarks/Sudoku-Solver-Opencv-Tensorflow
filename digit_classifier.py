@@ -21,48 +21,48 @@ class CnnClassifier:
 		self.model =model
 	
 	def load_data(self):
-		mnist = tf.keras.datasets.mnist 
-		(x_train, y_train),(x_test, y_test) = mnist.load_data()
+		# mnist = tf.keras.datasets.mnist 
+		# (x_train, y_train),(x_test, y_test) = mnist.load_data()
 
-		# labels_dirs = os.listdir('./Data')
-		# images = []
-		# image_labels = []
-		# for label_name in labels_dirs:
-		# 	files = os.listdir('./Data/'+label_name)
-		# 	# vec = [0]*10
-		# 	# vec[int(label_name)] = 1
-		# 	for f_name in files:
-		# 		img = cv2.imread('./Data/'+label_name+'/'+f_name,2)
-		# 		img = cv2.resize(img,(64,64))
-		# 		# print(img.shape)
-		# 		# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-		# 		ret, bw_img = cv2.threshold(img,127,255,cv2.THRESH_BINARY)
-		# 		inv = cv2.bitwise_not(bw_img)
-		# 		# print(inv.shape)
-		# 		# cv2.imshow("image",inv)
-		# 		# cv2.waitKey(0)
-		# 		images.append(inv)
-		# 		image_labels.append(int(label_name))
+		labels_dirs = os.listdir('./Data')
+		images = []
+		image_labels = []
+		for label_name in labels_dirs:
+			files = os.listdir('./Data/'+label_name)
+			# vec = [0]*10
+			# vec[int(label_name)] = 1
+			for f_name in files:
+				img = cv2.imread('./Data/'+label_name+'/'+f_name,2)
+				img = cv2.resize(img,(64,64))
+				# print(img.shape)
+				# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+				ret, bw_img = cv2.threshold(img,127,255,cv2.THRESH_BINARY)
+				inv = cv2.bitwise_not(bw_img)
+				# print(inv.shape)
+				cv2.imshow("image",inv)
+				cv2.waitKey(0)
+				images.append(inv)
+				image_labels.append(int(label_name))
 
-		# images = np.array(images)
-		# image_labels = np.array(image_labels)
-		# # np.random.shuffle(images)
-		# # np.random.shuffle()
-		# images,image_labels = shuffle(images,image_labels)
-		# print(images.shape)
-		# print(image_labels.shape)
+		images = np.array(images)
+		image_labels = np.array(image_labels)
+		# np.random.shuffle(images)
+		# np.random.shuffle()
+		images,image_labels = shuffle(images,image_labels)
+		self.x_train = tf.keras.utils.normalize(images[:9000], axis=1)
+		# self.x_train = tf.keras.utils.normalize(x_train, axis=1)
+		self.x_test = tf.keras.utils.normalize(images[9000:], axis=1)
+		# self.x_test = tf.keras.utils.normalize(x_test, axis=1)
+
+		self.y_train = image_labels[:9000]
+		# self.y_train = y_train
+		self.y_test = image_labels[9000:]
+		# self.y_test = y_test
+		# exit(0)
+		print(images.shape)
+		print(image_labels.shape)
 		# print(x_train.shape,y_train.shape)
 		# print(y_train[0])
-		# self.x_train = tf.keras.utils.normalize(images[:9000], axis=1)
-		self.x_train = tf.keras.utils.normalize(x_train, axis=1)
-		# self.x_test = tf.keras.utils.normalize(images[9000:], axis=1)
-		self.x_test = tf.keras.utils.normalize(x_test, axis=1)
-
-		# self.y_train = image_labels[:9000]
-		self.y_train = y_train
-		# self.y_test = image_labels[9000:]
-		self.y_test = y_test
-		# exit(0)
 
 	def save_model(self):
 		self.model.save('./weights')
