@@ -1,101 +1,126 @@
 import tensorflow as tf
 import numpy as np
-import os
-import cv2
-from sklearn.utils import shuffle
+from sklearn.preprocessing import LabelBinarizer
+from tensorflow.keras.preprocessing.image import img_to_array
+import argparse
+import sys
 
 class CnnClassifier:
 	def __init__(self,load_model=False):
 		if load_model:
 			self.load_model()
 
-	def create_model(self):
+	def create_model(self,learning_rate=1e-3):
+		print("[INFO] Creating the model")
 		model = tf.keras.models.Sequential()
+		model.add(tf.keras.layers.Conv2D(32, (5, 5), padding="same",
+			input_shape=(28,28,1)))
+		model.add(tf.keras.layers.Activation("relu"))
+		model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
+
+		# CONV => RELU => POOL layers
+		model.add(tf.keras.layers.Conv2D(32, (3, 3), padding="same"))
+		model.add(tf.keras.layers.Activation("relu"))
+		model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
+
+		# FC => RELU layers
 		model.add(tf.keras.layers.Flatten())
+		model.add(tf.keras.layers.Dense(64))
+		model.add(tf.keras.layers.Activation("relu"))
+		model.add(tf.keras.layers.Dropout(0.5))
 
-		model.add(tf.keras.layers.Dense(128, activation=tf.nn.relu))
-		model.add(tf.keras.layers.Dense(128, activation=tf.nn.relu))
+		# FC => RELU layers
+		model.add(tf.keras.layers.Dense(64))
+		model.add(tf.keras.layers.Activation("relu"))
+		model.add(tf.keras.layers.Dropout(0.5))
 
-		model.add(tf.keras.layers.Dense(10, activation=tf.nn.softmax))
-		model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+		# softmax classifier
+		model.add(tf.keras.layers.Dense(10))
+		model.add(tf.keras.layers.Activation("softmax"))
+
+		model.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate)
+						,metrics=["accuracy"])
 		self.model =model
 	
 	def load_data(self):
-		# mnist = tf.keras.datasets.mnist 
-		# (x_train, y_train),(x_test, y_test) = mnist.load_data()
+		print("[INFO] Loading Data")
+		mnist = tf.keras.datasets.mnist 
+		(x_train, y_train),(x_test, y_test) = mnist.load_data()
 
-		labels_dirs = os.listdir('./Data')
-		images = []
-		image_labels = []
-		for label_name in labels_dirs:
-			files = os.listdir('./Data/'+label_name)
-			# vec = [0]*10
-			# vec[int(label_name)] = 1
-			for f_name in files:
-				img = cv2.imread('./Data/'+label_name+'/'+f_name,2)
-				img = cv2.resize(img,(64,64))
-				# print(img.shape)
-				# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-				ret, bw_img = cv2.threshold(img,127,255,cv2.THRESH_BINARY)
-				inv = cv2.bitwise_not(bw_img)
-				# print(inv.shape)
-				cv2.imshow("image",inv)
-				cv2.waitKey(0)
-				images.append(inv)
-				image_labels.append(int(label_name))
+		x_train = x_train.reshape((x_train.shape[0], 28, 28, 1))
+		x_test = x_test.reshape((x_test.shape[0], 28, 28, 1))
 
-		images = np.array(images)
-		image_labels = np.array(image_labels)
-		# np.random.shuffle(images)
-		# np.random.shuffle()
-		images,image_labels = shuffle(images,image_labels)
-		self.x_train = tf.keras.utils.normalize(images[:9000], axis=1)
+		# scale data to the range of [0, 1]
+		x_train = x_train.astype("float32") / 255.0
+		x_test = x_test.astype("float32") / 255.0
+
+		# convert the labels from integers to vectors
+		le = LabelBinarizer()
+		y_train = le.fit_transform(y_train)
+		y_test = le.transform(y_test)
+
 		# self.x_train = tf.keras.utils.normalize(x_train, axis=1)
-		self.x_test = tf.keras.utils.normalize(images[9000:], axis=1)
 		# self.x_test = tf.keras.utils.normalize(x_test, axis=1)
 
-		self.y_train = image_labels[:9000]
-		# self.y_train = y_train
-		self.y_test = image_labels[9000:]
-		# self.y_test = y_test
-		# exit(0)
-		print(images.shape)
-		print(image_labels.shape)
-		# print(x_train.shape,y_train.shape)
-		# print(y_train[0])
+		self.y_train = y_train
+		self.y_test = y_test
 
-	def save_model(self):
-		self.model.save('./weights')
+	def save_model(self,model_name):
+		self.model.save(model_name, save_format="h5")
 
-	def load_model(self):
-		self.model = tf.keras.models.load_model('./weights')
+	def load_model(self,model_name='trained_model.h5'):
+		self.model = tf.keras.models.load_model(model_name)
 
 	def evaluate(self):
 		test_loss, test_acc = self.model.evaluate(x=self.x_test, y=self.y_test) 
 		print("Test loss:",test_loss)
 		print("Test accuracy:",test_acc)
 
-	def train(self,no_epochs=10,save_model=True):
-		self.create_model()
+	def train(self,model_name,batch_size=128,no_epochs=10,learning_rate=1e-3,save_model=True):
+		self.create_model(learning_rate=learning_rate)
 		self.load_data()
-		self.model.fit(x=self.x_train, y=self.y_train, epochs=no_epochs)
+		print("[INFO] Training model")
+		self.model.fit(self.x_train, self.y_train,validation_data=(self.x_test, self.y_test),
+					batch_size=batch_size,epochs=no_epochs,verbose=1)
 		self.evaluate()
 		if save_model:
-			self.save_model()
+			self.save_model(model_name)
 
 	def detect(self,image):
-		image = np.array([image])
-		image = tf.keras.utils.normalize(image, axis=1)
-		prediction = self.model.predict(image)
-		return np.argmax(prediction)
+		assert image.shape[0]==28 and image.shape[1]==28
+		image = image.astype("float") / 255.0
+		image = img_to_array(image)
+		image = np.expand_dims(image, axis=0)
+		prediction = self.model.predict(image).argmax(axis=1)[0]
+		return prediction
 
 
 if __name__ == '__main__':
-	classifier = CnnClassifier()
-	classifier.load_data()
-	# res = classifier.detect(classifier.x_train[0])
-	# print(res)
-	classifier.train()
-	# classifier.evaluate()
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--train', help='--train model_name')
+	parser.add_argument('--batch_size',default=128,type=int,
+						help='--batch_size 128')
+	parser.add_argument('--epochs',default=100, type=int,
+						help='--epochs 100')
+	parser.add_argument('--lr',default=0.01, type=float,
+						help='--lr 0.1')
+	parser.add_argument('--evaluate', help='--evaluate model_name.h5')
+
+	if not len(sys.argv) > 1:
+		parser.print_help()
+		sys.exit(0)
+	else:
+		args = parser.parse_args()
+
+	classifier = CnnClassifier(load_model=True)
+	if args.evaluate is not None:
+		classifier.load_data()
+		classifier.load_model(model_name=args.evaluate)
+		classifier.evaluate()
+
+	if args.train is not None:
+		classifier.train(model_name=args.train,batch_size=args.batch_size,
+							 no_epochs=args.epochs,learning_rate= args.lr)
+
 
 	
