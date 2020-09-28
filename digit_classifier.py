@@ -6,9 +6,9 @@ import argparse
 import sys
 
 class CnnClassifier:
-	def __init__(self,load_model=False):
-		if load_model:
-			self.load_model()
+	def __init__(self,model_name=None):
+		if model_name is not None:
+			self.load_model(model_name)
 
 	def create_model(self,learning_rate=1e-3):
 		print("[INFO] Creating the model")
@@ -59,16 +59,18 @@ class CnnClassifier:
 		y_train = le.fit_transform(y_train)
 		y_test = le.transform(y_test)
 
-		# self.x_train = tf.keras.utils.normalize(x_train, axis=1)
-		# self.x_test = tf.keras.utils.normalize(x_test, axis=1)
+		self.x_train = x_train
+		self.x_test = x_test
 
 		self.y_train = y_train
 		self.y_test = y_test
 
 	def save_model(self,model_name):
+		print("[INFO] Saving the model")
 		self.model.save(model_name, save_format="h5")
 
 	def load_model(self,model_name='trained_model.h5'):
+		print("[INFO] Loading model")
 		self.model = tf.keras.models.load_model(model_name)
 
 	def evaluate(self):
@@ -100,8 +102,8 @@ if __name__ == '__main__':
 	parser.add_argument('--train', help='--train model_name')
 	parser.add_argument('--batch_size',default=128,type=int,
 						help='--batch_size 128')
-	parser.add_argument('--epochs',default=100, type=int,
-						help='--epochs 100')
+	parser.add_argument('--epochs',default=5, type=int,
+						help='--epochs 10')
 	parser.add_argument('--lr',default=0.01, type=float,
 						help='--lr 0.1')
 	parser.add_argument('--evaluate', help='--evaluate model_name.h5')
@@ -112,13 +114,13 @@ if __name__ == '__main__':
 	else:
 		args = parser.parse_args()
 
-	classifier = CnnClassifier(load_model=True)
 	if args.evaluate is not None:
+		classifier = CnnClassifier(model_name=args.evaluate)
 		classifier.load_data()
-		classifier.load_model(model_name=args.evaluate)
 		classifier.evaluate()
 
 	if args.train is not None:
+		classifier = CnnClassifier()
 		classifier.train(model_name=args.train,batch_size=args.batch_size,
 							 no_epochs=args.epochs,learning_rate= args.lr)
 

@@ -5,11 +5,12 @@ import cv2
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i","--image", required=True, help="path to input sudoku puzzle image")
+parser.add_argument("-m","--model",default="trained_model.h5",help="path to trained model")
 parser.add_argument('-d',"--debug",default=False, type=bool)
 args = parser.parse_args()
 
 image = cv2.imread(args.image)
-detector = Sudoku_Detector(debug=args.debug)
+detector = Sudoku_Detector(model_name=args.model,debug=args.debug)
 puzzle = detector.detect(image)
 valid = Sudoku_Solver.check_valid(puzzle)
 if not valid:

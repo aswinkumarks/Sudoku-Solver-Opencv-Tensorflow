@@ -5,9 +5,9 @@ from scipy.spatial import distance
 from digit_classifier import CnnClassifier
 
 class Sudoku_Detector:
-	def __init__(self,debug=False):
+	def __init__(self,model_name,debug=False):
 		self._debug = debug
-		self.classifier = CnnClassifier(load_model=True)
+		self.classifier = CnnClassifier(model_name=model_name)
 
 	def preprocess(self,image):
 		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
